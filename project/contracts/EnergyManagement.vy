@@ -1,4 +1,6 @@
 # @version ^0.3.7
+
+# Development of Blockchain-based Energy Management in Cuyo Island, Palawan: A simulation in Ganache
 struct User:
     name: String[20]
     demand: uint256
@@ -164,7 +166,5 @@ def check_grid_stability():
 def calculate_total_energy_sales():
     decimal_total_demand: decimal = convert(self.total_demand, decimal)
     self.total_energy_sales = decimal_total_demand * self.energy_price
-
-
 
 

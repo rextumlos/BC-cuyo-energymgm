@@ -37,7 +37,7 @@ event Grid_stability_changed:
     _is_stable: bool
 
 # Grid stability threshold
-stability_threshold: uint256 
+stability_threshold: public(uint256) 
 
 # Functions
 # initializing smart contract

@@ -26,13 +26,13 @@ grid_address: public(address)
 users: public(HashMap[address, User])
 
 # Energy production and price per kWh in the microgrid
-energy_production: public(decimal)
-power_rate: public(decimal)
+energy_production: decimal
+power_rate: decimal
 
 # Total users, transactions, energy demand and energy sales in the microgrid
-total_users: public(uint256)
-total_demand: public(decimal)
-total_energy_sales: public(decimal)
+total_users: uint256
+total_demand: decimal
+total_energy_sales: decimal
 total_transactions: uint256
 
 grid_is_stable: bool
@@ -54,7 +54,7 @@ event Grid_stability_changed:
     _is_stable: bool
 
 # Grid stability threshold
-stability_threshold: public(decimal) 
+stability_threshold: decimal
 
 # Functions
 # initializing smart contract
@@ -66,6 +66,7 @@ def __init__(owner_address: address, production: decimal, rate: decimal, thresho
     self.stability_threshold = threshold
     self.total_demand = 0.0
     self.total_users = 0
+    self.total_energy_sales = 0.0
     self.total_transactions = 0
     self.grid_is_stable = True
 
@@ -73,7 +74,7 @@ def __init__(owner_address: address, production: decimal, rate: decimal, thresho
 # updating the energy price
 def update_power_rate(owner_address: address, new_rate: decimal):
     # only the owner has access
-    assert owner_address == self.grid_address, "Invalid credentials."
+    assert owner_address == self.grid_address and msg.sender == self.grid_address, "Invalid credentials."
     old_rate: decimal = self.power_rate
     self.power_rate = new_rate
     log Rate_updated(old_rate, new_rate)
@@ -82,7 +83,7 @@ def update_power_rate(owner_address: address, new_rate: decimal):
 @external
 def update_threshold(owner_address: address, new_threshold: decimal):
     # only the owner has access
-    assert owner_address == self.grid_address, "Invalid credentials."
+    assert owner_address == self.grid_address and msg.sender == self.grid_address, "Invalid credentials."
 
     self.stability_threshold = new_threshold
 
@@ -113,6 +114,14 @@ def get_power_rate() -> decimal:
     return self.power_rate
 
 @external
+def get_stability_threshold() -> decimal:
+    return self.stability_threshold
+
+@external
+def get_energy_production() -> decimal:
+    return self.energy_production
+
+@external
 def get_total_energy_sales() -> decimal:
     self.calculate_total_energy_sales()
     return self.total_energy_sales
@@ -121,6 +130,18 @@ def get_total_energy_sales() -> decimal:
 def get_transactions() -> Transaction[100]:
     assert msg.sender == self.grid_address, "Invalid credentials."
     return self.transactions
+
+@external
+def get_total_users() -> uint256:
+    return self.total_users
+
+@external
+def get_total_transactions() -> uint256:
+    return self.total_transactions
+
+@external
+def get_grid_is_stable() -> bool:
+    return self.grid_is_stable
 
 # user functions
 @external 
@@ -153,6 +174,9 @@ def update_energy_consumption(user_address: address, new_consumption: decimal):
     assert user_address == msg.sender, "Invalid access"
     assert user.name != "", "Address not found."
 
+    if not self.users[user_address].demand_response_active:
+        assert self.energy_production >= self.total_demand + new_consumption * 720.0, "Too much energy."
+
     old_demand: decimal = self.users[user_address].demand
     self.total_demand -= self.users[user_address].demand
     self.users[user_address].energy_consumption = new_consumption
@@ -163,10 +187,12 @@ def update_energy_consumption(user_address: address, new_consumption: decimal):
 
     self.check_grid_stability()
     self.calculate_electric_bill(user_address)  # Calculate electric bill
-    self.update_transactions(user_address)
 
     if self.users[user_address].demand_response_active:
-        self.apply_demand_response(new_consumption, user_address)
+        self.apply_demand_response(self.users[user_address].demand, user_address)
+        self.update_transactions(user_address)
+    else:
+        self.update_transactions(user_address)
 
 @external
 def update_demand_response(user_address: address, active: bool):
@@ -195,11 +221,11 @@ def set_demand_response_rate(user_address: address):
     average_demand: decimal = self.total_demand / convert(self.total_users, decimal)
 
     # simple algorithm for setting the demand response rate
-    if average_demand <= 50.0:
+    if average_demand <= 500.0:
         self.users[user_address].demand_response_rate = 0.1
-    elif average_demand <= 100.0:
+    elif average_demand <= 1000.0:
         self.users[user_address].demand_response_rate = 0.2
-    elif average_demand <= 200.0:
+    elif average_demand <= 2000.0:
         self.users[user_address].demand_response_rate = 0.3
     else:
         self.users[user_address].demand_response_rate = 0.4

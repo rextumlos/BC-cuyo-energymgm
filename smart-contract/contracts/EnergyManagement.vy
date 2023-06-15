@@ -260,5 +260,3 @@ def update_transactions(user_address: address):
     })
 
     self.total_transactions += 1
-
-

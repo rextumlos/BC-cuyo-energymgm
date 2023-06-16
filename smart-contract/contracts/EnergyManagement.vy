@@ -12,6 +12,7 @@ struct Transaction:
     energy_consumption: uint256     # decimal
     demand: uint256                 # Energy required per month # decimal
     electric_bill: uint256          # decimal
+    month: uint256
 
 transactions: Transaction[100]
 
@@ -169,13 +170,22 @@ def get_user_electric_bill(user_address: address) -> uint256:
     return self.users[user_address].electric_bill
 
 @external
-def update_energy_consumption(user_address: address, new_consumption: uint256):
+def update_energy_consumption(user_address: address, new_consumption: uint256, month: uint256):
     user: User =  self.users[user_address]
     assert user_address == msg.sender, "Invalid access"
     assert user.name != "", "Address not found."
 
     assert self.energy_production >= self.total_consumption + new_consumption, "Too much energy."
 
+    if self.transactions[0].fromAddress != 0x0000000000000000000000000000000000000000:
+        old_month: uint256 = 0
+        for transaction in self.transactions:
+            if transaction.fromAddress == user_address:
+                if transaction.month >= old_month:
+                    old_month = transaction.month
+        assert month == old_month + 1, "Invalid month."
+    
+    
     old_demand: uint256 = self.users[user_address].demand
     self.total_demand -= self.users[user_address].demand
     self.total_consumption -= self.users[user_address].energy_consumption
@@ -191,7 +201,7 @@ def update_energy_consumption(user_address: address, new_consumption: uint256):
     self.check_grid_stability()
     self.calculate_electric_bill(user_address)  # Calculate electric bill
 
-    self.update_transactions(user_address)
+    self.update_transactions(user_address, month)
 
 @internal
 def check_grid_stability():
@@ -211,12 +221,13 @@ def calculate_electric_bill(user_address: address):
     self.users[user_address].electric_bill = self.users[user_address].energy_consumption * self.power_rate
 
 @internal
-def update_transactions(user_address: address):
+def update_transactions(user_address: address, month: uint256):
     self.transactions[self.total_transactions] = Transaction({
         fromAddress: user_address,
         energy_consumption: self.users[user_address].energy_consumption,
         demand:  self.users[user_address].demand,
         electric_bill: self.users[user_address].electric_bill,
+        month: month,
     })
 
     self.total_transactions += 1

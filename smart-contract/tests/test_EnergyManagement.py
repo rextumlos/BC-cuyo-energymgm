@@ -90,7 +90,8 @@ def test_update_energy_consumption(microgrid):
     txn.wait(1)
     
     new_consumption = 105600
-    txn_update = microgrid.update_energy_consumption(accounts[1], new_consumption, {'from': accounts[1]})
+    month = 1
+    txn_update = microgrid.update_energy_consumption(accounts[1], new_consumption, month, {'from': accounts[1]})
     txn_update.wait(1)
     
     expected = str(int(105600 / 720))
@@ -106,9 +107,10 @@ def test_fail_update_energy_consumption(microgrid):
     txn.wait(1)
     
     new_consumption = 658565000
+    month = 1
     
     with pytest.raises(VirtualMachineError):
-        microgrid.update_energy_consumption(accounts[1], new_consumption, {"from": accounts[1]})
+        microgrid.update_energy_consumption(accounts[1], new_consumption, month, {"from": accounts[1]})
 
 def test_get_electric_bill(microgrid):
     new_user_address = accounts[1]
@@ -118,7 +120,8 @@ def test_get_electric_bill(microgrid):
     txn.wait(1)
     
     new_consumption = 105600
-    txn_update = microgrid.update_energy_consumption(accounts[1], new_consumption, {'from': accounts[1]})
+    month = 1
+    txn_update = microgrid.update_energy_consumption(accounts[1], new_consumption, month, {'from': accounts[1]})
     txn_update.wait(1)
     
     expected = new_consumption * microgrid.get_power_rate.call()
@@ -140,11 +143,13 @@ def test_get_transactions(microgrid):
     txn_2.wait(1)
     
     new_consumption = 10900000
-    txn_update = microgrid.update_energy_consumption(accounts[1], new_consumption, {'from': accounts[1]})
+    month = 1
+    txn_update = microgrid.update_energy_consumption(accounts[1], new_consumption, month, {'from': accounts[1]})
     txn_update.wait(1)
     
     new_consumption_2 = 75000
-    txn_update_consumption_2 = microgrid.update_energy_consumption(accounts[2], new_consumption_2, {'from': accounts[2]})
+    month_2 = 1
+    txn_update_consumption_2 = microgrid.update_energy_consumption(accounts[2], new_consumption_2, month_2, {'from': accounts[2]})
     txn_update_consumption_2.wait(1)
     
     with pytest.raises(VirtualMachineError):
@@ -154,3 +159,27 @@ def test_get_transactions(microgrid):
     actual_len = len(microgrid.get_transactions.call({"from": accounts[0]}))
     assert expected_len == actual_len
     
+def test_month_in_update(microgrid):
+    first_user_address = accounts[1]
+    first_username = "Cuyo"
+    
+    txn = microgrid.add_users(accounts[0], first_user_address, first_username, {'from': accounts[0]})
+    txn.wait(1)
+    
+    new_consumption_1 = 100000
+    month_1 = 1
+    txn_update = microgrid.update_energy_consumption(accounts[1], new_consumption_1, month_1, {'from': accounts[1]})
+    txn_update.wait(1)
+    
+    new_consumption_2 = 113000
+    month_2 = 2
+    with pytest.raises(VirtualMachineError):
+        error_month = 1
+        microgrid.update_energy_consumption(accounts[1], new_consumption_2, error_month, {'from': accounts[1]})
+        
+    txn_update_2 = microgrid.update_energy_consumption(accounts[1], new_consumption_2, month_2, {'from': accounts[1]})
+    txn_update_2.wait(1)
+    
+    expected = new_consumption_2
+    actual = microgrid.get_user_consumption.call(accounts[1], {'from': accounts[1]})
+    assert expected == actual

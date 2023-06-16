@@ -5,25 +5,26 @@ from brownie.exceptions import VirtualMachineError
 
 @pytest.fixture()
 def microgrid():
-    energy_production = 7902770000
-    power_rate = 10000
+    energy_production = 658564000
+    power_rate = 9670
     threshold = 100000
     microgrid = accounts[0].deploy(EnergyManagement, accounts[0], energy_production, power_rate, threshold)
     return microgrid
 
 def test_init(microgrid):
     assert microgrid.grid_address() == accounts[0]
-    assert microgrid.get_energy_production.call() == 7902770000
-    assert microgrid.get_power_rate.call() == 10000
+    assert microgrid.get_energy_production.call() == 658564000
+    assert microgrid.get_power_rate.call() == 9670
     assert microgrid.get_stability_threshold.call() == 100000
     assert microgrid.get_total_demand.call() == 0
+    assert microgrid.get_total_consumption.call() == 0
     assert microgrid.get_total_users.call() == 0
     assert microgrid.get_total_energy_sales.call() == 0
     assert microgrid.get_total_transactions.call() == 0
     assert microgrid.get_grid_is_stable.call() == True
     
 def test_update_power_rate(microgrid):
-    expected = 20000
+    expected = 10000
     txn = microgrid.update_power_rate(accounts[0], expected)
     txn.wait(1)
     
@@ -88,11 +89,11 @@ def test_update_energy_consumption(microgrid):
     txn = microgrid.add_users(accounts[0], new_user_address, new_username, {'from': accounts[0]})
     txn.wait(1)
     
-    new_consumption = 20000
+    new_consumption = 105600
     txn_update = microgrid.update_energy_consumption(accounts[1], new_consumption, {'from': accounts[1]})
     txn_update.wait(1)
     
-    expected = str(20000 * 720)
+    expected = str(int(105600 / 720))
     
     actual = microgrid.get_user_demand.call(new_user_address, {'from': accounts[1]})
     assert expected == actual
@@ -104,7 +105,7 @@ def test_fail_update_energy_consumption(microgrid):
     txn = microgrid.add_users(accounts[0], new_user_address, new_username, {'from': accounts[0]})
     txn.wait(1)
     
-    new_consumption = 11000000
+    new_consumption = 658565000
     
     with pytest.raises(VirtualMachineError):
         microgrid.update_energy_consumption(accounts[1], new_consumption, {"from": accounts[1]})
@@ -116,11 +117,11 @@ def test_get_electric_bill(microgrid):
     txn = microgrid.add_users(accounts[0], new_user_address, new_username, {'from': accounts[0]})
     txn.wait(1)
     
-    new_consumption = 20000
+    new_consumption = 105600
     txn_update = microgrid.update_energy_consumption(accounts[1], new_consumption, {'from': accounts[1]})
     txn_update.wait(1)
     
-    expected = new_consumption * 720 * microgrid.get_power_rate.call()
+    expected = new_consumption * microgrid.get_power_rate.call()
     actual = microgrid.get_user_electric_bill.call(accounts[1], {'from': accounts[1]})
     
     assert expected == actual

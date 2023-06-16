@@ -28,6 +28,7 @@ power_rate: uint256                 # decimal
 # Total users, transactions, energy demand and energy sales in the microgrid
 total_users: uint256
 total_demand: uint256               # decimal
+total_consumption: uint256
 total_energy_sales: uint256         # decimal
 total_transactions: uint256
 
@@ -61,6 +62,7 @@ def __init__(owner_address: address, production: uint256, rate: uint256, thresho
     self.power_rate = rate
     self.stability_threshold = threshold
     self.total_demand = 0
+    self.total_consumption = 0
     self.total_users = 0
     self.total_energy_sales = 0
     self.total_transactions = 0
@@ -102,6 +104,10 @@ def add_users(owner_address: address, user_address: address, name: String[20]):
 @external
 def get_total_demand() -> uint256:
     return self.total_demand
+
+@external
+def get_total_consumption() -> uint256:
+    return self.total_consumption
 
 @external
 def get_power_rate() -> uint256:
@@ -168,13 +174,17 @@ def update_energy_consumption(user_address: address, new_consumption: uint256):
     assert user_address == msg.sender, "Invalid access"
     assert user.name != "", "Address not found."
 
-    assert self.energy_production >= self.total_demand + new_consumption * 720, "Too much energy."
+    assert self.energy_production >= self.total_consumption + new_consumption, "Too much energy."
 
     old_demand: uint256 = self.users[user_address].demand
     self.total_demand -= self.users[user_address].demand
+    self.total_consumption -= self.users[user_address].energy_consumption
+
     self.users[user_address].energy_consumption = new_consumption
-    self.users[user_address].demand = new_consumption * 720  # Assuming 720 hours in a month (30 days)
-    self.total_demand += new_consumption * 720
+    self.users[user_address].demand = new_consumption / 720
+
+    self.total_demand += new_consumption / 720
+    self.total_consumption += new_consumption
 
     log Demand_updated(user_address, old_demand, self.users[user_address].demand)
 
@@ -194,11 +204,11 @@ def check_grid_stability():
 
 @internal
 def calculate_total_energy_sales():
-    self.total_energy_sales = self.total_demand * self.power_rate
+    self.total_energy_sales = self.total_consumption * self.power_rate
 
 @internal
 def calculate_electric_bill(user_address: address):
-    self.users[user_address].electric_bill = self.users[user_address].energy_consumption * 720 * self.power_rate
+    self.users[user_address].electric_bill = self.users[user_address].energy_consumption * self.power_rate
 
 @internal
 def update_transactions(user_address: address):
